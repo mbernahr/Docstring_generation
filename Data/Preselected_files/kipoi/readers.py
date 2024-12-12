@@ -1,0 +1,239 @@
+"""Readers useful for creating new dataloaders
+
+- HDF5Reader
+"""
+import numpy as np
+from kipoi_utils.external.flatten_json import unflatten_list
+from abc import abstractmethod
+
+from packaging.version import Version
+
+class Reader(object):
+
+    @abstractmethod
+    def batch_iter(self, batch_size=4, **kwargs):
+        pass
+
+    @abstractmethod
+    def load_all(self):
+        pass
+
+# --------------------------------------------
+
+
+def _h5py_dataset_iterator(g, prefix=''):
+    import h5py
+    for key in g:
+        item = g[key]
+        path = '{}/{}'.format(prefix, key)
+        if isinstance(item, h5py.Dataset):  # test for dataset
+            if Version(h5py.__version__) > Version('2.10.0'):
+                string_type = h5py.check_string_dtype(item.dtype)
+                if (string_type is not None) and (string_type.encoding == "utf-8"):
+                    item = item.asstr()[:]
+            yield (path, item)
+        elif isinstance(item, h5py.Group):  # test for group (go down)
+            for x in _h5py_dataset_iterator(item, path):
+                yield x
+
+
+class HDF5Reader(Reader):
+    """Read the HDF5 file. Convenience wrapper around h5py.File
+
+    # Arguments
+        file_path: File path to an HDF5 file
+    """
+
+    def __init__(self, file_path):
+        import h5py
+        self.file_path = file_path
+
+        # self.f = h5py.File(self.file_path, "r")
+        self.f = None
+
+    def ls(self):
+        """Recursively list the arrays
+        """
+        self._file_open()
+        return list(_h5py_dataset_iterator(self.f))
+
+    def _file_open(self):
+        if self.f is None:
+            raise ValueError("File not opened. Please run self.open() or use the context manager" +
+                             ": with HDF5Reader('file') as f: ...")
+
+    def load_all(self, unflatten=True):
+        """Load the whole file
+
+        # Arguments
+            unflatten: if True, nest/unflatten the keys.
+              e.g. an entry `f['/foo/bar']` would need to be accessed
+              using two nested `get` call: `f['foo']['bar']`
+        """
+        d = dict()
+        for k, v in self.ls():
+            d[k] = v[:]
+        if unflatten:
+            return unflatten_list(d, "/")
+        else:
+            return d
+
+    def batch_iter(self, batch_size=16, **kwargs):
+        """Create a batch iterator over the whole file
+
+        # Arguments
+            batch_size: batch size
+            **kwargs: ignored argument. Used for consistency with other dataloaders
+        """
+        datasets = self.ls()
+        n_batches = int(np.ceil(len(self) / batch_size))
+        for i in range(n_batches):
+            d = dict()
+            for k, v in datasets:
+                if i == n_batches - 1:
+                    # last batch
+                    d[k] = v[(i * batch_size):]
+                else:
+                    d[k] = v[(i * batch_size):((i + 1) * batch_size)]
+            yield unflatten_list(d, "/")
+
+    def __len__(self):
+        datasets = self.ls()
+        return datasets[0][1].shape[0]
+
+    def __enter__(self):
+        import h5py
+        self.f = h5py.File(self.file_path, "r")
+        return self
+
+    def __exit__(self, *args):
+        self.f.close()
+
+    def open(self):
+        """Open the file
+        """
+        self.__enter__()
+
+    def close(self):
+        """Close the file
+        """
+        self.__exit__()
+
+    @classmethod
+    def load(cls, file_path, unflatten=True):
+        """Load the data all at once (classmethod).
+
+        # Arguments
+            file_path: HDF5 file path
+            unflatten: see `load_all`
+        """
+        with cls(file_path) as f:
+            return f.load_all(unflatten=unflatten)
+
+
+def _zarr_dataset_iterator(g, prefix=''):
+    import zarr
+    for key in g:
+        item = g[key]
+        path = '{}/{}'.format(prefix, key)
+        if isinstance(item, zarr.core.Array):  # test for dataset
+            yield (path, item)
+        elif isinstance(item, zarr.hierarchy.Group):  # test for group (go down)
+            for x in _zarr_dataset_iterator(item, path):
+                yield x
+
+
+class ZarrReader(Reader):
+    """Read the Zarr file. Convenience wrapper around zarr.group
+
+    # Arguments
+        file_path: File path to an Zarr file
+    """
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+        self.store = None
+        self.root = None
+
+    def ls(self):
+        """Recursively list the arrays
+        """
+        self._file_open()
+        return list(_zarr_dataset_iterator(self.root))
+
+    def _file_open(self):
+        if self.root is None:
+            raise ValueError("File not opened. Please run self.open() or use the context manager" +
+                             ": with ZarReader('file') as f: ...")
+
+    def load_all(self, unflatten=True):
+        """Load the whole file
+
+        # Arguments
+            unflatten: if True, nest/unflatten the keys.
+              e.g. an entry `f['/foo/bar']` would need to be accessed
+              using two nested `get` call: `f['foo']['bar']`
+        """
+        d = dict()
+        for k, v in self.ls():
+            d[k] = v[:]
+        if unflatten:
+            return unflatten_list(d, "/")
+        else:
+            return d
+
+    def batch_iter(self, batch_size=16, **kwargs):
+        """Create a batch iterator over the whole file
+
+        # Arguments
+            batch_size: batch size
+            **kwargs: ignored argument. Used for consistency with other dataloaders
+        """
+        datasets = self.ls()
+        n_batches = int(np.ceil(len(self) / batch_size))
+        for i in range(n_batches):
+            d = dict()
+            for k, v in datasets:
+                if i == n_batches - 1:
+                    # last batch
+                    d[k] = v[(i * batch_size):]
+                else:
+                    d[k] = v[(i * batch_size):((i + 1) * batch_size)]
+            yield unflatten_list(d, "/")
+
+    def __len__(self):
+        datasets = self.ls()
+        return datasets[0][1].shape[0]
+
+    def __enter__(self):
+        import zarr
+        from kipoi.writers import get_zarr_store
+        self.store = get_zarr_store(self.file_path)
+        self.root = zarr.group(self.store, overwrite=False)
+        return self
+
+    def __exit__(self, *args):
+        if hasattr(self.store, 'close'):
+            self.store.close()
+
+    def open(self):
+        """Open the file
+        """
+        self.__enter__()
+
+    def close(self):
+        """Close the file
+        """
+        self.__exit__()
+
+    @classmethod
+    def load(cls, file_path, unflatten=True):
+        """Load the data all at once (classmethod).
+
+        # Arguments
+            file_path: Zarr file path
+            unflatten: see `load_all`
+        """
+        with cls(file_path) as f:
+            return f.load_all(unflatten=unflatten)
