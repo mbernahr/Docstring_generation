@@ -27,7 +27,7 @@ This project aims to automatically generate missing docstrings in Python functio
 
 ## Large Language Model
 
-In this project, a model from [Hugging Face](https://huggingface.co) Llama 3 is used and fine-tuned.
+In this project, a model from [Hugging Face](https://huggingface.co), such as Llama 3, is used and fine-tuned.
 
 ## Docstring generation Script
 
@@ -50,6 +50,19 @@ Run the script as follows:
 python docstring_generation.py
 ```
 
+### What the Script Does
+1. Guides the user to provide a Python script to analyze.
+2. Extracts all functions from the input script.
+3. Analyzes the quality of existing docstrings.
+4. Generates new docstrings for missing or inadequate ones using the fine-tuned LLM.
+5. Outputs a new Python file with the updated docstrings.
+
+The updated file will be saved in the Results directory.
+
+### Contributors
+
+- Marius Bernahrndt
+- Maximilian Karhausen
 
 
 
