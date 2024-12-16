@@ -43,7 +43,8 @@ existing docstrings.
       fine-tuning dataset of approximately 13,000 functions with docstrings.
 
   A typical entry in the final dataset looks like this:
-  '''[Function] def function(a, b):\n ... \nreturn list [Docstring] Do X and return a list.'''
+  
+  ```[Function] def function(a, b):\n ... \nreturn list [Docstring] Do X and return a list.```
 
 ## Large Language Model
 
