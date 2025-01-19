@@ -287,12 +287,15 @@ def analyze_file(filename):
         function_name, function_source, function_doc, num_args, code_length = func
         print(f'\n--- Analyzing function: {function_name} ---')
         analysis_results = analyze_function(function_name, function_source, function_doc, num_args, code_length)
+        start_line = func[3]
         results.append({
             "Name": function_name,
             "Docstring": function_doc,
             "Source": function_source,
             "IsComplex": analysis_results["is_complex"],
             "Score": analysis_results["score"],
+            "StartLine": start_line,
+            "CodeLength": code_length
         })
 
     return results
