@@ -175,7 +175,8 @@ def calculate_docstring_score(pylint_output, pydocstyle_output, docstring_conten
             if not docstring_content['Examples']:
                 score -= discounts['Examples']
 
-    return score
+    # Ensure score is not below 0
+    return max(score, 0)
 
 
 def remove_docstring_from_ast(func_node):

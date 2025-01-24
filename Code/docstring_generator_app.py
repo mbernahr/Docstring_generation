@@ -24,6 +24,9 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
         self.functions = []
         self.text_generator = None
 
+        self.selection_states = {}
+        self.function_data = {}
+
         # UI Setup
         self.setup_ui()
         self.setup_drag_and_drop()
@@ -71,29 +74,51 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
         self.tree_frame = tk.Frame(self)
         self.tree_frame.pack(pady=10, padx=10)
 
-        self.tree = ttk.Treeview(self.tree_frame, columns=("Function", "Score", "Status"), show="headings", height=10)
+        self.tree = ttk.Treeview(
+            self.tree_frame,
+            columns=("Selected", "Function", "Score", "Status"),
+            show="headings",
+            height=10
+        )
+        self.tree.heading("Selected", text="Selected")
         self.tree.heading("Function", text="Function")
         self.tree.heading("Score", text="Score")
         self.tree.heading("Status", text="Status")
+        self.tree.column("Selected", width=50, anchor="center")
         self.tree.column("Function", width=200, anchor="w")
         self.tree.column("Score", width=100, anchor="center")
-        self.tree.column("Status", width=100, anchor="center")
+        self.tree.column("Status", width=50, anchor="center")
         self.tree.pack(fill=tk.BOTH, expand=True)
+
+        # Event binding for clicking on the treeview
+        self.tree.bind("<Button-1>", self.on_tree_click)
 
     def setup_buttons(self):
         """Setup buttons for UI interactions."""
-        # Buttons for docstring generation
-        self.generate_all_button = tk.Button(
-            self, text="Generate docstrings for all functions",
-            command=lambda: self.generate_docstrings(for_all=True), state=tk.DISABLED
-        )
-        self.generate_all_button.pack(pady=5)
+        # Frame
+        self.button_frame = tk.Frame(self)
+        self.button_frame.pack(padx=10, pady=5)
 
-        self.generate_low_button = tk.Button(
-            self, text="Generate docstrings for functions with a low score",
-            command=lambda: self.generate_docstrings(for_all=False), state=tk.DISABLED
+        # Buttons for selection
+        self.select_all_button = tk.Button(
+            self.button_frame, text="Select all",
+            command=self.select_all, state=tk.DISABLED
         )
-        self.generate_low_button.pack(pady=5)
+        self.select_all_button.pack(padx=5, side=tk.LEFT)
+
+        self.select_low_button = tk.Button(
+            self.button_frame, text="Select functions with low score",
+            command=self.select_low_score, state=tk.DISABLED
+        )
+        self.select_low_button.pack(pady=5, side=tk.LEFT)
+
+        # Button for generation
+        self.generate_button = tk.Button(
+            self,
+            text="Generate",
+            command=self.generate_docstrings, state=tk.DISABLED
+        )
+        self.generate_button.pack(pady=5)
 
     def setup_progress_bar(self):
         """Setup the progress bar and status indicators."""
@@ -146,40 +171,87 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
         """Analyze the selected Python file for functions."""
         self.tree.delete(*self.tree.get_children())
         self.functions = analyze_file(self.filename)
+        self.selection_states.clear()
+        self.function_data.clear()
 
         if not self.functions:
             messagebox.showinfo("No functions", "The selected file does not contain any functions.")
             return
 
         for func in self.functions:
+            # status green or red
             status = "\U0001F7E2" if func["Score"] >= 75 else "\U0001F534"
-            self.tree.insert("", "end", values=(func["Name"], func["Score"], status))
+            row_id = self.tree.insert("", "end", values=("", func["Name"], func["Score"], status))
+            self.selection_states[row_id] = False
+            self.function_data[row_id] = func
 
         is_model_ready = self.text_generator is not None
-        self.generate_all_button.config(state=tk.NORMAL if is_model_ready else tk.DISABLED)
-        self.generate_low_button.config(state=tk.NORMAL if is_model_ready else tk.DISABLED)
+        self.select_low_button.config(state=tk.NORMAL if is_model_ready else tk.DISABLED)
+        self.select_all_button.config(state=tk.NORMAL if is_model_ready else tk.DISABLED)
+        self.generate_button.config(state=tk.NORMAL if is_model_ready else tk.DISABLED)
+
+    def on_tree_click(self, event):
+        """Recognise the click on the checkbox in the tree."""
+        region = self.tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
+        column = self.tree.identify_column(event.x)
+        row_id = self.tree.identify_row(event.y)
+
+        # "#1' -> Selected
+        if column == "#1" and row_id:
+            self.toogle_selection(row_id)
+
+    def toogle_selection(self, row_id):
+        """Change checkbox and update treeview."""
+        current_state = self.selection_states[row_id]
+        new_state = not current_state
+        self.selection_states[row_id] = new_state
+
+        self.tree.set(row_id, "Selected", "X" if new_state else "")
+
+    def select_all(self):
+        """Mark all functions as selected."""
+        for row_id in self.selection_states:
+            self.selection_states[row_id] = True
+            self.tree.set(row_id, "Selected", "X")
+
+    def select_low_score(self):
+        """Mark all function with a score < 75."""
+        for row_id, func_info in self.function_data.items():
+            is_low_score = func_info["Score"] < 75
+            self.selection_states[row_id] = is_low_score
+            self.tree.set(row_id, "Selected", "X" if is_low_score else "")
 
     def init_model(self):
         """Initialize the language model."""
         try:
-            model_path = "../Models/meta-llama/CodeLlama-7b-Python-hf_run5e7bfd2ad529/checkpoint-200"
+            model_path = "../Models/meta-llama/CodeLlama-7b-Python-hf_run23086723ea/checkpoint-500"
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"Using {device} for model loading.")
 
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             tokenizer.pad_token = tokenizer.eos_token
-            model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.bfloat16, device_map=None).to(
-                device)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16,
+                device_map=None
+            ).to(device)
             model.eval()
 
-            self.text_generator = pipeline("text-generation", model=model, tokenizer=tokenizer,
-                                           device=0 if device == "cuda" else -1)
-            self.update_loading_status(100, ready=True)
+            self.text_generator = pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=tokenizer,
+                device=0 if device == "cuda" else -1
+            )
+            self.update_loading_status(ready=True)
         except Exception as e:
             messagebox.showerror("Error", f"Model could not be loaded: {e}")
-            self.update_loading_status(0, ready=False)
+            self.update_loading_status(ready=False)
 
-    def update_loading_status(self, percent, ready=False):
+    def update_loading_status(self, ready=False):
         """Update the status indicator for the model."""
         if ready:
             self.status_label.config(text="Model ready", fg="green")
@@ -190,10 +262,14 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
         self.update_idletasks()
 
     def generate_docstrings(self, for_all=True):
-        """Generate docstrings for all or only for functions with a low score."""
-        target_functions = self.get_target_functions(for_all)
+        """Generate docstrings for all selected functions."""
+        target_functions = []
+        for row_id, selected in self.selection_states.items():
+            if selected:
+                target_functions.append(self.function_data[row_id])
+
         if not target_functions:
-            messagebox.showinfo("No functions", "There are no functions with a low score.")
+            messagebox.showinfo("No functions selected", "Please select at least one function.")
             return
 
         # Set progress to startvalue
@@ -215,10 +291,6 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
 
         messagebox.showinfo("Finish", f"All docstrings have been generated. Updated file saved as {updated_filename}.")
         self.reset_progress()
-
-    def get_target_functions(self, for_all):
-        """Return the target functions for docstring generation."""
-        return self.functions if for_all else [f for f in self.functions if f["Score"] < 75]
 
     def process_functions(self, file_content, target_functions):
         """Generate docstrings and update file content."""
@@ -294,7 +366,7 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
 
     def update_progress(self, current, total):
         """Update the progress bar."""
-        progress_percent = max(1, int((current/total)*100))
+        progress_percent = max(1, int((current / total) * 100))
         self.progress_bar["value"] = progress_percent
         self.progress_label.config(text=f"Progress: {progress_percent}%")
         self.update_idletasks()
