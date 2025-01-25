@@ -227,7 +227,7 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
     def init_model(self):
         """Initialize the language model."""
         try:
-            model_path = "../Models/meta-llama/CodeLlama-7b-Python-hf_run23086723ea/checkpoint-500"
+            model_path = "../Models/meta-llama/CodeLlama-7b-Python-hf_run23086723ea/end_of_training"
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"Using {device} for model loading.")
 
@@ -284,13 +284,19 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
 
     def _generate_docstrings_thread(self, target_functions):
         """Threaded function to generate docstrings."""
-        file_content = self.read_file(self.filename)
-        updated_content = self.process_functions(file_content, target_functions)
-        updated_filename = self.filename.replace(".py", "_updated.py")
-        self.save_updated_file(updated_filename, updated_content)
+        try:
+            file_content = self.read_file(self.filename)
+            updated_content = self.process_functions(file_content, target_functions)
+            updated_filename = self.filename.replace(".py", "_updated.py")
+            self.save_updated_file(updated_filename, updated_content)
 
-        messagebox.showinfo("Finish", f"All docstrings have been generated. Updated file saved as {updated_filename}.")
-        self.reset_progress()
+            self.after(0, lambda: messagebox.showinfo(
+                "Finish",
+                f"All docstrings have been generated. Updated file saved as {updated_filename}."
+            ))
+            self.reset_progress()
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", f"An error occurred: {e}"))
 
     def process_functions(self, file_content, target_functions):
         """Generate docstrings and update file content."""
@@ -313,7 +319,8 @@ class DocstringApp(TkinterDnD.Tk):  # Inherit from TkinterDnD.Tk for drag-and-dr
         processed_response = self.postprocess_response(response)
         docstring_start = processed_response.find("[Docstring]") + len("[Docstring]")
         docstring_end = processed_response.find("[EOS]")
-        cleaned_response = processed_response[docstring_start:docstring_end].strip()
+        cleaned_response = processed_response[docstring_start:docstring_end] \
+            .replace("\\n\\n", "\n\n").replace("\\n", "\n").strip()
 
         print(f"\n--- Generated Docstring: {func['Name']} \n {cleaned_response} ---")
         return cleaned_response
