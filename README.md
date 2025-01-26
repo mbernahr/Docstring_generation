@@ -1,4 +1,4 @@
-# Automated docstring generation for Python <img src="Icon/Python-Docstring-Generator-Icon.png" alt="Icon" width="40">
+# Automated docstring generation for Python <img src="Icon/Python-Docstring-Generator-Icon.png" alt="Icon" width="80">
 
 This project develops an end-to-end system for the automatic generation and improvement of docstrings in Python files
 using Large Language Models (LLMs). The aim is to add missing docstrings to existing scripts as well as to optimize the
@@ -28,6 +28,13 @@ The repository is organized as follows:
     - `inference_finetuned_LLM_docstring.ipynb`:  
       A Jupyter notebook for evaluating the fine-tuned model's performance. It uses BLEU and ROUGE scores to measure
       similarity with reference docstrings and provides visual comparisons between generated and reference docstrings.
+
+- [Icon](Icon):  
+  Contains the application icon that is displayed in the dock when the program is executed.
+
+- [Models](Models):  
+  Contains the final checkpoint of the fine-tuned model, which is used in the application for docstring generation.
+
 
 ## Background
 
