@@ -1,4 +1,4 @@
-# Automated docstring generation for Python
+# Automated docstring generation for Python <img src="Icon/Python-Docstring-Generator-Icon.png" alt="Icon" width="40">
 
 This project develops an end-to-end system for the automatic generation and improvement of docstrings in Python files
 using Large Language Models (LLMs). The aim is to add missing docstrings to existing scripts as well as to optimize the
@@ -11,10 +11,23 @@ The repository is organized as follows:
 - [Data](Data):  
   Contains the raw data (Python scripts), filtered scripts, and training and test data for fine-tuning.
 - [Code](Code):  
-  Contains scripts for filtering the dataset, analyzing the docstrings, fine-tuning the LLM and inserting new
-  docstrings.
+  Contains the following scripts and notebooks for dataset processing, analysis, and fine-tuning:
+    - `create_finetune_dataset.py`:  
+      Creates the dataset used for fine-tuning the model.
+    - `docstring_analysis.py`:  
+      Analyzes docstrings in Python scripts. This script is used during dataset creation and is also utilized in the
+      app.
+    - `docstring_generator_app.py`:  
+      A complete application that wraps the fine-tuned model, analyzes Python files, and generates docstrings for
+      functions.
+    - `finetune_LLM_docstring.ipynb`:  
+      A Jupyter notebook for fine-tuning the model using LoRA (Low-Rank Adaptation).
+
 - [Results](Results):  
-  Contains output files, e.g. scripts with improved docstrings, log files of the evaluation and an evaluation report.
+  Contains test and evaluation files, including:
+    - `inference_finetuned_LLM_docstring.ipynb`:  
+      A Jupyter notebook for evaluating the fine-tuned model's performance. It uses BLEU and ROUGE scores to measure
+      similarity with reference docstrings and provides visual comparisons between generated and reference docstrings.
 
 ## Background
 
@@ -43,13 +56,35 @@ existing docstrings.
       fine-tuning dataset of approximately 13,000 functions with docstrings.
 
   A typical entry in the final dataset looks like this:
-  
-  ```[Function] def function(a, b):\n ... \nreturn list [Docstring] Do X and return a list.```
 
-## Large Language Model
+  ```[Function] def function(a, b):\n ... \nreturn list [Docstring] Do X and return a list. [EOS]```
 
-In this project, a model from [Hugging Face](https://huggingface.co), such as Llama 3, is used and fine-tuned on the
+## Fine-Tuning Large Language Model
+
+In this project, the model [CodeLlama](https://huggingface.co/meta-llama/CodeLlama-7b-Python-hf)
+from [Hugging Face](https://huggingface.co) is fine-tuned using LoRA (Low-Rank Adaptation) on an
 extracted and filtered dataset.
+
+1. **Dataset Preparation**:
+    - The training and test datasets are loaded from text files containing Python functions and corresponding
+      docstrings.
+    - The dataset is tokenized to prepare it for fine-tuning.
+
+2. **Model Setup**:
+    - The pre-trained model (`meta-llama/CodeLlama-7b-Python-hf`) is loaded from Hugging Face.
+    - LoRA is applied to fine-tune the model with efficient parameter adaptation.
+
+3. **Fine-Tuning Configuration**:
+    - The training process is configured with parameters such as learning rate, batch size, and gradient accumulation.
+    - Additional tools like `wandb` and `mlflow` are used for experiment tracking and monitoring.
+
+4. **Evaluation**:
+    - The fine-tuned model is tested using a pipeline on several prompts, and the generated docstrings are evaluated for
+      syntax, semantic clarity, and completeness.
+    - Evaluation metrics include BLEU and ROUGE scores.
+
+5. **Inference**:
+    - The fine-tuned model is saved and used in the application to generate docstrings for Python functions.
 
 ## Docstring generation Script
 
@@ -63,6 +98,27 @@ Clone the repository and install the [required dependencies](Code/requirements.t
 ```bash
 git clone https://github.com/mbernahr/Docstring_generation.git
 cd Docstring_generation/Code
+```
+
+#### Create virtual environment
+
+- Linux/Mac:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+- Windows:
+
+```bash
+python -m venv venv
+venv\Scripts\activate 
+```
+
+#### Install the required dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -76,13 +132,18 @@ python docstring_generation.py
 
 ### What the Script Does
 
-1. Guides the user to provide a Python script to analyze.
-2. Extracts all functions from the input script.
-3. Analyzes the quality of existing docstrings.
-4. Generates new docstrings for missing or inadequate ones using the fine-tuned LLM.
-5. Outputs a new Python file with the updated docstrings.
+1. Provides a graphical user interface (GUI) for selecting a Python script to analyze.
+2. Extracts all functions from the selected script and displays them in a table, including their current docstring
+   quality scores.
+3. Allows the user to:
+    - Select all functions.
+    - Focus on functions with low-quality scores for targeted improvements.
+    - Select specific functions manually for docstring generation.
+4. Generates new docstrings for missing or inadequate ones using the fine-tuned model.
+5. Updates the Python script with the generated docstrings and saves the modified file with a new name in the same
+   directory.
 
-The updated file will be saved in the Results directory.
+The updated file is saved with the suffix `_updated.py`.
 
 ### Contributors
 
