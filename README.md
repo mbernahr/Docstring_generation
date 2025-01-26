@@ -134,7 +134,7 @@ pip install -r requirements.txt
 Run the script as follows:
 
 ```bash
-python docstring_generation.py
+python docstring_generator_app.py
 ```
 
 ### What the Script Does
