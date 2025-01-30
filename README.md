@@ -131,7 +131,7 @@ pip install -r ..\requirements.txt
 
 ### Usage
 
-Before the first use, create an account at https://huggingface.co and create a token. Then login with token von huggingface:
+Before the first use, create an account at https://huggingface.co and create a token. Next, login with the token from huggingface:
 ```bash
 huggingface-cli login
 ```
