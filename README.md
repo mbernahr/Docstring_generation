@@ -95,12 +95,12 @@ extracted and filtered dataset.
 
 ## Docstring generation Script
 
-The script requires **Python >= 3.10** and uses the libraries [pandas](https://pandas.pydata.org/) (*BSD 3-Clause
+The script requires **Python 3.10** and uses the libraries [pandas](https://pandas.pydata.org/) (*BSD 3-Clause
 License*), [matplotlib](https://matplotlib.org/) (*Matplotlib License*), and the standard Python libraries `json`, `os`.
 
 ### Installation
 
-Clone the repository and install the [required dependencies](Code/requirements.txt) as follows:
+Clone the repository and install the [required dependencies](/requirements.txt) as follows:
 
 ```bash
 git clone https://github.com/mbernahr/Docstring_generation.git
